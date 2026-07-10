@@ -2,6 +2,7 @@ import os
 import numpy as np
 from pypdf import PdfReader
 from openai import OpenAI
+from anthropic import Anthropic
 from dotenv import load_dotenv
 
 
@@ -21,6 +22,7 @@ def loading(file_path):
     Returns:
         str: The text content of the PDF file.
     """
+    print("Loading ...")
     reader = PdfReader(file_path)
     text = ""
     for page in reader.pages:
@@ -37,6 +39,7 @@ def chunking(text):
     Returns:
         list: A list of text chunks.
     """
+    print("Chunking ...")
     chunk_size = 500  # Define the size of each chunk
     overlap = 0
     length = len(text)
@@ -58,6 +61,7 @@ def embedding(chunks):
     Returns:
         list: A list of embeddings for each chunk of text.
     """
+    print("Embedding ...")
     client = OpenAI()
     embeddings = []
     for chunk in chunks:
@@ -68,7 +72,7 @@ def embedding(chunks):
         embeddings.append(response.data[0].embedding)
     return embeddings
 
-vector_db:list[tuple[np.ndarray,str]] = []
+
 
 
 def vector_store(vectors:list[list[float]],chunks:list[str]):
@@ -81,12 +85,13 @@ def vector_store(vectors:list[list[float]],chunks:list[str]):
     Returns:
         list: A list of vectorized embeddings.
     """
-    
+    print("Vectorizing ...")
+    vector_db:list[tuple[np.ndarray,str]] = []
     for vector, text in zip(vectors, chunks):
         vector_db.append((np.array(vector), text))
     return vector_db
 
-def retrieval(query_embedding:list[list[float]]):
+def retrieval(query_embedding:list[list[float]], vector_db:list[tuple[np.ndarray,str]]):
     """
     Retrieve relevant text chunks based on a query.
 
@@ -95,6 +100,7 @@ def retrieval(query_embedding:list[list[float]]):
     Returns:
         list: A list of relevant text chunks based on the query.
     """
+    print("Retrieving ...")
     # Calculate cosine similarity between the query vector and each vector in the vector store
     query_vector = np.array(query_embedding[0])
     similarities = []
@@ -118,7 +124,9 @@ def generation(query:str, retrieved_chunks:list[str]):
     Returns:
         str: The generated response based on the query and retrieved text chunks.
     """
-    client = OpenAI()
+    print("Generating ...")
+    # client = OpenAI()
+    client = Anthropic()
     context = " ".join(retrieved_chunks)
     system_prompt = """You are an AI assistant. You need to answer user's question based on the provided context only.
     Do not make up any information. If the answer is not present in the context, respond with "I don't know"."""
@@ -128,14 +136,15 @@ def generation(query:str, retrieved_chunks:list[str]):
     Answer:<your answer based on the context>
     Source of information: <specific chunk of text from the context that contains the answer>
     """
-    response = client.chat.completions.create(
-        model=OPENAI_MODEL,
+    response = client.messages.create(
+        model="claude-sonnet-4-5",
+        system=system_prompt,
         messages=[
-            {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
-        ]
+        ],
+        max_tokens=100
     )
-    return response.choices[0].message.content
+    return response.content[0].text
 
 print("Injestion started...")
 text = loading(FILE_PATH)
@@ -144,8 +153,8 @@ embeddings = embedding(chunks)
 vectors = vector_store(embeddings, chunks)
 
 print("Retrieval started...")
-query = "What is the total refund amount given?"
+query = "What is the time of departure to Paris?"
 query_embedding = embedding([query])
-retrieved_chunks = retrieval(query_embedding)
+retrieved_chunks = retrieval(query_embedding, vectors)
 response = generation(query, retrieved_chunks)
 print(f"Response generated: {response}")
