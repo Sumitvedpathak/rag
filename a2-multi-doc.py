@@ -41,7 +41,7 @@ def retrieval(query, vector_db):
 
 def generation(query, retrieved_chunks):
     print("Generating response ...")
-    context = "\n\n".join([f"[Source: {chunk.metadata['source']}]\n{chunk.page_content}" for chunk in retrieved_chunks])
+    context = " ".join([f"[Source: {chunk.metadata['source']}]\n{chunk.page_content}" for chunk in retrieved_chunks])
     prompt = f""" You are an helpful assistant. Use the following context to answer the question. If the answer is not contained within the context, respond with "I don't know."
     Context: {context}\n\nQuestion: {query}\nAnswer:
     Answer the question, then on a new line cite the source file(s) you actually used, in this format:

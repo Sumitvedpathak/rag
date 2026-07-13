@@ -19,7 +19,7 @@ def vector_store(vectors, chunks):
     print("Creating vector store ...")
     return None
 
-def retrieval(query_embedding, vector_db):
+def retrieval(query, vector_db):
     print("Retrieving ...")
     return None
 
@@ -34,9 +34,11 @@ embeddings = embedding(chunks)
 vectors = vector_store(embeddings, chunks)
 
 print("Retrieval started...")
-query = "What is the time of departure to Paris?"
-query_embedding = embedding([query])
-retrieved_chunks = retrieval(query_embedding, vectors)
-response = generation(query, retrieved_chunks)
-print(f"Response generated: {response}")
+while True:
+    query = input("Enter your query (or type 'exit' to quit): ")
+    if query.lower() == 'exit':
+        break
+    retrieved_chunks = retrieval(query, vectors)
+    response = generation(query, retrieved_chunks)
+    print(f"Response generated: {response}")
     
