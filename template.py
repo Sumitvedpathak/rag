@@ -41,4 +41,39 @@ while True:
     retrieved_chunks = retrieval(query, vectors)
     response = generation(query, retrieved_chunks)
     print(f"Response generated: {response}")
-    
+
+
+
+
+
+
+import os
+import shutil
+from dotenv import load_dotenv
+
+load_dotenv() 
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+DirecTORY_PATH = "resource/a5/"
+
+if os.path.exists("vectors/a5"):
+    shutil.rmtree("vectors/a5")
+
+def ingestion():
+    return None
+
+def retrival(query, store):
+    return None
+
+def generation(query, retrieved_chunks):
+    return None
+
+store = ingestion()
+while True:
+    query = input("Enter your query (or type 'exit' to quit): ")
+    if query.lower() == 'exit':
+        break
+    response = retrival(query, store)
+
+    response = generation(query, response)
+    print(f"\nPlain Response - {response}")
