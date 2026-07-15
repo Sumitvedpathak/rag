@@ -22,11 +22,10 @@ def loading():
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
     chunks = text_splitter.split_documents(docs)
 
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
     if not os.path.exists("vectors/a5"):
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         store = Chroma.from_documents(chunks, embeddings, persist_directory="vectors/a5")
     else:
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         store = Chroma(persist_directory="vectors/a5", embedding_function=embeddings)
 
     tokenized_corpus = [tokenize(c.page_content) for c in chunks] #extracts words from chunks
@@ -97,6 +96,7 @@ def _reranker(query, fused_chunks, top_n=5):
     return reranked_chunks
 
 def hybrid_search_retrieval(query,store,bm25):
+    print("Searching...")
     dense_chunks = _dense_search(query, store, 20)
     sparse_chunks = _bm25_search(query, bm25, chunks, 20)  # Ensure 'chunks' is passed correctly
     fused_chunks = _fusion(dense_chunks, sparse_chunks, k=60, top_k=20)
@@ -104,14 +104,37 @@ def hybrid_search_retrieval(query,store,bm25):
     return reranked_chunks
 
 def generation(query, reranked_chunks):
-    client = ChatOpenAI(model_name="gpt-5.6-luna", temperature=0.7, max_tokens=500)
-    prompt = f""" You are an helpful assistant. Use the following context to answer the question. If the answer is not contained within the context, respond with "I don't know."
+    print("Generation...")
+    client = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7, max_tokens=500)
+    summarized_chunks = []
+    #cannot do it in one call, as the context is too long, so we summarize each chunk and then combine them to answer the query. 
+    # Also risk of misalignment is reduced, as the chunks are summarized based on the query, so the context and meaning stay intact.
+    for chunk in reranked_chunks:
+        prompt = f""" You are an helpful assistant. You need to summarize the chunks based on the query provided(do not change query) so that the context and the meaning stay intact. Do not remove any find any keywords
+        Query: {query}
+        Context:
+        {chunk['chunk'].page_content}
+        """
+        response = client.invoke(prompt)
+        summarized_chunks.append(response.content)
+    
+    #This will give the full answer, but it will show the citations on which chunk the answer is based on.
+    sys_prompt = f""" You are an helpful assistant. Answer the question using ONLY the context below.
+    Cite your sources inline using [1], [2], etc., matching the numbered context blocks.
+    Every factual claim must have a citation. If the context does not contain the answer, respond exactly with:
+    "I don't know based on the available documentation."
+    Do not use any outside knowledge."
     Context:
-    {' '.join([r["chunk"].page_content for r in reranked_chunks])}
+    {' '.join([f'[{i+1}-{c["chunk"].metadata.get("source")}] {chunk}' for i, (c,chunk) in enumerate(zip(reranked_chunks,summarized_chunks))])} # citation provided for each chunk with number.
     Question:
     {query}
+    Display all file paths used in the answer, and if information from multiple sources was used, list each one. If sources disagree, say so explicitly and cite each source separately rather than picking one.
+    [1] - <file path from the label above>
+    [2] - <file path from the label above>
+    ...
     """
-    response = client.invoke(prompt)
+    response = client.invoke(sys_prompt)
+
     return response.content
 
 chunks, store, bm25 = loading()
