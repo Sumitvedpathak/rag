@@ -31,35 +31,12 @@ def ingestion(directory_path):
     print("Ingestion completed.")
     return store
 
-def queryCondensation(query, chat_history):
-    print("Condensing query ...")
-    history_context = " ".join([f"User: {entry['query']}\nAssistant: {entry['response']}" for entry in chat_history])
-    prompt = f"""You are an AI assistant. Given the following conversation history and a new user query, condense the query to its essential information for retrieval purposes.
-    Conversation History: {history_context}
-    New User Query: {query}
-    Condensed Query:"""
-    client = ChatOpenAI(model_name="gpt-4o-mini", temperature=0, max_tokens=100) #Keep temperature low for deterministic output more for variation/creative in output
-    response = client.invoke(prompt)
-    return response.content
-
-
 def retrieval(query, store):
     print("Retrieving ...")
-    condensed_query = queryCondensation(query, chatHistory[-5:])  # Use the last 5 entries of chat history for context
-    print(f"Condensed Query: {condensed_query}")
-    retrieved_chunks = store.similarity_search(condensed_query, k=5)
     return retrieved_chunks,condensed_query
 
 def generation(query, retrieved_chunks):
     print("Generating response ...")
-    context = " ".join([f"[Source: {chunk.metadata['source']}]\n{chunk.page_content}" for chunk in retrieved_chunks])
-    prompt = f""" You are an helpful assistant. Use the following context to answer the question. If the answer is not contained within the context, respond with "I don't know."
-    Context: {context}\n\nQuestion: {query}\nAnswer:
-    Answer the question, then on a new line cite the source file(s) you actually used, in this format:
-    Source: <file path from the label above>
-    If information from multiple sources was used, list each one. If sources disagree, say so explicitly and cite each source separately rather than picking one."""
-    client = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.7, max_tokens=500)
-    response = client.invoke(prompt)
     return response.content
 
 print("Ingestion Initiating!")
